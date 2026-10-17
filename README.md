@@ -107,16 +107,13 @@ universe_remembers_you/
 ├── saves/
 │
 ├── src/
-│   ├── base.cpp
 │   ├── celestialBody.cpp
 │   ├── celestialBody.h
 │   ├── main.cpp
 │   ├── physics.cpp
 │   ├── physics.h
-│   ├── random.cpp
 │   ├── renderer.cpp
 │   ├── renderer.h
-│   ├── target.txt
 │   ├── universe.cpp
 │   └── universe.h
 │
