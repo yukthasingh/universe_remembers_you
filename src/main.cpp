@@ -541,84 +541,83 @@ int main()
                 eventText.setFillColor(sf::Color(225, 230, 255));
                 eventText.setPosition({consolePosition.x + 18.f, eventY});
 
-                // shorten a message if it is too wide to fit in the blue box
-                if (eventText.getGlobalBounds().size.x >= consoleSize.x - 36.f)
+                // // shorten a message if it is too wide to fit in the blue box
+                // if (eventText.getGlobalBounds().size.x >= consoleSize.x - 36.f)
+                // {
+                //     std::istringstream words(eventHistory[i]);
+
+                //     std::string word;
+                //     std::string wrapped;
+                //     std::string currentLine;
+
+                //     while (words >> word)
+                //     {
+                //         // see what the line would look like if we added the next word
+                //         std::string testLine = currentLine;
+
+                //         if (!testLine.empty())
+                //         {
+                //             testLine += " ";
+                //         }
+
+                //         testLine += word;
+
+                //         eventText.setString("> " + testLine);
+
+                //         // if the new word makes the line too wide, start a new line
+                //         if (eventText.getGlobalBounds().size.x >= consoleSize.x - 36.f)
+                //         {
+                //             if (!wrapped.empty())
+                //             {
+                //                 wrapped += "\n ";
+                //             }
+
+                //             wrapped += currentLine;
+                //             currentLine = word;
+                //         }
+                //         else
+                //         {
+                //             currentLine + testLine;
+                //         }
+                //     }
+
+                window.draw(eventText);
+
+                eventY += 28.f;
+
+                if (eventY > consolePosition.y + consoleSize.y - 25.f)
                 {
-                    std::istringstream words(eventHistory[i]);
-
-                    std::string word;
-                    std::string wrapped;
-                    std::string currentLine;
-
-                    while (words >> word)
-                    {
-                        // see what the line would look like if we added the next word
-                        std::string testLine = currentLine;
-
-                        if (!testLine.empty())
-                        {
-                            testLine += " ";
-                        }
-
-                        testLine += word;
-
-                        eventText.setString("> " + testLine);
-
-                        // if the new word makes the line too wide, start a new line
-                        if (eventText.getGlobalBounds().size.x >= consoleSize.x - 36.f)
-                        {
-                            if (!wrapped.empty())
-                            {
-                                wrapped += "\n ";
-                            }
-
-                            wrapped += currentLine;
-                            currentLine = word;
-                        }
-                        else
-                        {
-                            currentLine + testLine;
-                        }
-                    }
-
-                    window.draw(eventText);
-
-                    eventY += 28.f;
-
-                    if (eventY > consolePosition.y + consoleSize.y - 25.f)
-                    {
-                        break;
-                    }
+                    break;
                 }
             }
-
-            // drawing all sprites in the toolbar
-            // these always stay here even after the user drags a copy into dark space
-            window.draw(asteroidSprite);
-            window.draw(earthSprite);
-            window.draw(sunSprite);
-            window.draw(moonSprite);
-            window.draw(activePlanet);
-
-            // draw the dropdown above everything else when it is open
-            if (isDropdownOpen)
-            {
-                for (const auto &planet : dropdownPlanets)
-                {
-                    window.draw(planet);
-                }
-            }
-
-            // draw the object being dragged last so it stays visible under the mouse
-            if (isDragging && draggedSprite)
-            {
-                window.draw(*draggedSprite);
-            }
-
-            // display the window
-            window.display();
         }
 
-        return 0;
+        // drawing all sprites in the toolbar
+        // these always stay here even after the user drags a copy into dark space
+        window.draw(asteroidSprite);
+        window.draw(earthSprite);
+        window.draw(sunSprite);
+        window.draw(moonSprite);
+        window.draw(activePlanet);
+
+        // draw the dropdown above everything else when it is open
+        if (isDropdownOpen)
+        {
+            for (const auto &planet : dropdownPlanets)
+            {
+                window.draw(planet);
+            }
+        }
+
+        // draw the object being dragged last so it stays visible under the mouse
+        if (isDragging && draggedSprite)
+        {
+            window.draw(*draggedSprite);
+        }
+
+        // display the window
+        window.display();
     }
+
+    return 0;
 }
