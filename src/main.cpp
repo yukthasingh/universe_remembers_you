@@ -13,8 +13,13 @@
 int main()
 {
     // initializing game window
-    sf::RenderWindow window(sf::VideoMode({1600, 800}), "A Universe that Remembers You", sf::Style::Titlebar | sf::Style::Close | sf::Style::Resize, sf::State::Windowed);
+    sf::RenderWindow window(sf::VideoMode({1600, 800}),
+                            "A Universe that Remembers You",
+                            sf::Style::Titlebar | sf::Style::Close | sf::Style::Resize,
+                            sf::State::Windowed);
+
     sf::View view(sf::FloatRect({0.f, 0.f}, {1600.f, 800.f}));
+    window.setView(view);
 
     // setting up font and text that shows up on the window when opened
     // uhh gotta fix this font stuff cause it is not working
@@ -41,6 +46,7 @@ int main()
         // Reserve the bottom for images while extending the black area toward the chat.
         const float darkLeft = horizontalMargin;
         const float darkRight = windowWidth * 4.f / 8.f + panelExtension;
+
         darkSpace.setPosition({darkLeft, topMargin});
         darkSpace.setSize({std::max(0.f, darkRight - darkLeft + 250.f),
                            std::max(0.f, windowHeight - imageSpace - topMargin)});
@@ -103,46 +109,43 @@ int main()
 
     // updating sprite layouts so basically they are under the black box and that they are spaced out evenly
     const auto updateSpriteLayout =
-        [&asteroidSprite, &earthSprite, &sunSprite, &moonSprite](sf::Vector2u windowSize)
+        [&asteroidSprite, &earthSprite, &sunSprite, &moonSprite, &darkSpace](sf::Vector2u windowSize)
     {
-        constexpr float horizontalMargin = 50.f;
         constexpr float bottomMargin = 25.f;
 
-        const float windowWidth =
-            static_cast<float>(windowSize.x);
         const float windowHeight =
             static_cast<float>(windowSize.y);
 
-        // Use the left 5/8 of the window for the sprites.
-        const float imageAreaLeft = horizontalMargin;
-        const float imageAreaRight = windowWidth * 5.f / 8.f;
-        const float imageAreaWidth =
-            imageAreaRight - imageAreaLeft;
+        // Use the EXACT left and right edges of the black box
+        const float areaLeft = darkSpace.getPosition().x;
+        const float areaWidth = darkSpace.getSize().x;
 
-        // Divide the available width into four sprite slots.
-        const float slotWidth = imageAreaWidth / 5.f;
+        // Five equal sections:
+        // asteroid | earth | sun | moon | planet
+        const float slotWidth = areaWidth / 5.f;
 
-        // Place each sprite near the bottom of the window.
-        const float asteroidHeight =
-            asteroidSprite.getGlobalBounds().size.y;
-        const float earthHeight =
-            earthSprite.getGlobalBounds().size.y;
-        const float sunHeight =
-            sunSprite.getGlobalBounds().size.y;
-        const float moonHeight =
-            moonSprite.getGlobalBounds().size.y;
+        // Center each sprite inside its section
+        const auto centerInSlot =
+            [&](sf::Sprite &sprite, int slot)
+        {
+            const auto bounds = sprite.getGlobalBounds();
 
-        asteroidSprite.setPosition({imageAreaLeft,
-                                    windowHeight - asteroidHeight - bottomMargin});
+            const float slotLeft =
+                areaLeft + slotWidth * static_cast<float>(slot);
 
-        earthSprite.setPosition({imageAreaLeft + slotWidth,
-                                 windowHeight - earthHeight - bottomMargin});
+            const float x =
+                slotLeft + (slotWidth - bounds.size.x) / 2.f;
 
-        sunSprite.setPosition({imageAreaLeft + slotWidth * 2.f,
-                               windowHeight - sunHeight - bottomMargin});
+            const float y =
+                windowHeight - bounds.size.y - bottomMargin;
 
-        moonSprite.setPosition({imageAreaLeft + slotWidth * 3.f,
-                                windowHeight - moonHeight - bottomMargin});
+            sprite.setPosition({x, y});
+        };
+
+        centerInSlot(asteroidSprite, 0);
+        centerInSlot(earthSprite, 1);
+        centerInSlot(sunSprite, 2);
+        centerInSlot(moonSprite, 3);
     };
 
     updateSpriteLayout(window.getSize());
@@ -179,50 +182,49 @@ int main()
     for (int i = 0; i < 6; ++i)
     {
         sf::Sprite optionSprite(planetTextures[i]);
-        optionSprite.setScale({0.5f, 0.5f}); // Scale down the dropdown options
+        optionSprite.setScale({1.f, 1.f}); // Scale down the dropdown options
 
         dropdownPlanets.push_back(optionSprite);
     }
 
     const auto updatePlanetLayout =
-        [&activePlanet, &dropdownPlanets](sf::Vector2u windowSize)
+        [&activePlanet, &dropdownPlanets, &darkSpace](sf::Vector2u windowSize)
     {
-        constexpr float horizontalMargin = 50.f;
-        constexpr float bottomMargin = 25.f;
 
-        const float windowWidth =
-            static_cast<float>(windowSize.x);
+        constexpr float bottomMargin = 25.f;
 
         const float windowHeight =
             static_cast<float>(windowSize.y);
 
-        // Same area used by asteroid, earth, sun, and moon
-        const float imageAreaLeft = horizontalMargin;
-        const float imageAreaRight = windowWidth * 5.f / 8.f;
-        const float imageAreaWidth =
-            imageAreaRight - imageAreaLeft;
+        const float areaLeft = darkSpace.getPosition().x;
+        const float areaWidth = darkSpace.getSize().x;
+        const float slotWidth = areaWidth / 5.f;
 
-        // Five total slots
-        const float slotWidth = imageAreaWidth / 5.f;
+        const auto planetBounds = activePlanet.getGlobalBounds();
 
-        const auto planetBounds =
-            activePlanet.getGlobalBounds();
+        const float slotLeft =
+            areaLeft + slotWidth * 4.f;
 
-        // Fifth slot
         const float planetX =
-            imageAreaLeft + slotWidth * 4.f;
+            slotLeft + (slotWidth - planetBounds.size.x) / 2.f;
 
         const float planetY =
             windowHeight - planetBounds.size.y - bottomMargin;
 
-        activePlanet.setPosition({planetX,
-                                  planetY});
+        activePlanet.setPosition({planetX, planetY});
 
-        // Dropdown options will appear ABOVE the selected planet
+        // Put the six choices in a compact 2 x 3 grid above the selected planet.
+        constexpr float optionGap = 8.f;
+        const float optionWidth = dropdownPlanets[0].getGlobalBounds().size.x;
+        const float optionHeight = dropdownPlanets[0].getGlobalBounds().size.y;
+
         for (std::size_t i = 0; i < dropdownPlanets.size(); ++i)
         {
-            dropdownPlanets[i].setPosition({planetX,
-                                            planetY - 45.f * static_cast<float>(i + 1)});
+            const float column = static_cast<float>(i % 2);
+            const float row = static_cast<float>(i / 2);
+
+            dropdownPlanets[i].setPosition({planetX + column * (optionWidth + optionGap),
+                                            planetY - (3.f - row) * (optionHeight + optionGap)});
         }
     };
 
@@ -231,23 +233,22 @@ int main()
     // making a game loop that keeps the window open until the user closes it
     while (window.isOpen())
     {
+        // INPUT / EVENTS
         while (const std::optional event = window.pollEvent())
         {
-
-            // close window at exist
             if (event->is<sf::Event::Closed>())
             {
                 window.close();
             }
 
-            if (const auto *resizedEvent =
-                    event->getIf<sf::Event::Resized>())
+            if (const auto *resizedEvent = event->getIf<sf::Event::Resized>())
             {
-                const sf::Vector2f size(
+                const sf::Vector2f newSize(
                     static_cast<float>(resizedEvent->size.x),
                     static_cast<float>(resizedEvent->size.y));
 
-                view.setSize(size);
+                // Keep world coordinates matched to the resized window.
+                view = sf::View(sf::FloatRect({0.f, 0.f}, newSize));
                 window.setView(view);
 
                 updateLayout(resizedEvent->size);
@@ -255,41 +256,69 @@ int main()
                 updatePlanetLayout(resizedEvent->size);
             }
 
-            // // clear screen
-            window.clear(sf::Color::White);
-
-            // draw dark space
-            window.draw(darkSpace);
-
-            // draw console box
-            window.draw(consoleBox);
-
-            // drawing all sprites
-            window.draw(asteroidSprite);
-            window.draw(earthSprite);
-            window.draw(sunSprite);
-            window.draw(moonSprite);
-            window.draw(activePlanet);
-
-            // handle mouse click events for the planet dropdown
-            if (event->is<sf::Event::MouseButtonPressed>())
+            if (const auto *mousePressed = event->getIf<sf::Event::MouseButtonPressed>())
             {
-                if (isDropdownOpen)
+                if (mousePressed->button == sf::Mouse::Button::Left)
                 {
-                    for (const auto &planet : dropdownPlanets)
+                    const sf::Vector2f mousePosition =
+                        window.mapPixelToCoords(mousePressed->position);
+
+                    // Clicking the selected planet opens/closes the dropdown.
+                    if (activePlanet.getGlobalBounds().contains(mousePosition))
                     {
-                        window.draw(planet);
+                        isDropdownOpen = !isDropdownOpen;
+                    }
+                    else if (isDropdownOpen)
+                    {
+                        bool selectedPlanet = false;
+
+                        for (std::size_t i = 0; i < dropdownPlanets.size(); ++i)
+                        {
+                            if (dropdownPlanets[i].getGlobalBounds().contains(mousePosition))
+                            {
+                                activePlanetIndex = static_cast<int>(i);
+                                activePlanet.setTexture(planetTextures[i], true);
+                                activePlanet.setScale({2.f, 2.f});
+
+                                updatePlanetLayout(window.getSize());
+                                isDropdownOpen = false;
+                                selectedPlanet = true;
+                                break;
+                            }
+                        }
+
+                        // Clicking somewhere else closes the dropdown.
+                        if (!selectedPlanet)
+                        {
+                            isDropdownOpen = false;
+                        }
                     }
                 }
             }
-
-            // draw text
-            // window.draw(text);
-
-            // display the window
-            window.display();
         }
 
-        return 0;
+        // RENDERING
+        window.clear(sf::Color::White);
+
+        window.draw(darkSpace);
+        window.draw(consoleBox);
+
+        window.draw(asteroidSprite);
+        window.draw(earthSprite);
+        window.draw(sunSprite);
+        window.draw(moonSprite);
+        window.draw(activePlanet);
+
+        if (isDropdownOpen)
+        {
+            for (const auto &planet : dropdownPlanets)
+            {
+                window.draw(planet);
+            }
+        }
+
+        window.display();
     }
+
+    return 0;
 }
