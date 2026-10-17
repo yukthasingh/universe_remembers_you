@@ -1,8 +1,10 @@
 #include <algorithm>
 #include <iostream>
+#include <optional>
 #include <vector>
 #include <string>
 #include <random>
+
 #include <SFML/Graphics.hpp>
 // #include <SFML/Audio.hpp>
 #include <SFML/Window.hpp>
@@ -22,9 +24,14 @@ int main()
     window.setView(view);
 
     // setting up font and text that shows up on the window when opened
-    // uhh gotta fix this font stuff cause it is not working
-    // const sf::Font font("arial.ttf");
-    // sf::Text text(font, "Don't..mess..this..up. I will remember what you do to me...forever..", 30);
+    // this is using a windows font for now so the universe log can actually show text before shipping v1
+    sf::Font consoleFont;
+    bool fontLoaded = consoleFont.openFromFile("C:/Windows/Fonts/arial.ttf");
+
+    if (!fontLoaded)
+    {
+        std::cerr << "Could not load font for the event console" << std::endl;
+    }
 
     // making a box that represents dark space
     sf::RectangleShape darkSpace;
@@ -190,7 +197,6 @@ int main()
     const auto updatePlanetLayout =
         [&activePlanet, &dropdownPlanets, &darkSpace](sf::Vector2u windowSize)
     {
-
         constexpr float bottomMargin = 25.f;
 
         const float windowHeight =
@@ -218,17 +224,130 @@ int main()
         const float optionWidth = dropdownPlanets[0].getGlobalBounds().size.x;
         const float optionHeight = dropdownPlanets[0].getGlobalBounds().size.y;
 
+        const float gridWidth = optionWidth * 2.f + optionGap;
+        const float gridLeft = slotLeft + (slotWidth - gridWidth) / 2.f;
+
         for (std::size_t i = 0; i < dropdownPlanets.size(); ++i)
         {
             const float column = static_cast<float>(i % 2);
             const float row = static_cast<float>(i / 2);
 
-            dropdownPlanets[i].setPosition({planetX + column * (optionWidth + optionGap),
+            dropdownPlanets[i].setPosition({gridLeft + column * (optionWidth + optionGap),
                                             planetY - (3.f - row) * (optionHeight + optionGap)});
         }
     };
 
     updatePlanetLayout(window.getSize());
+
+    // this is the event history that will be displayed in the blue console box
+    std::vector<std::string> eventHistory;
+    eventHistory.push_back("Universe initialized.");
+    eventHistory.push_back("Drag an object into dark space.");
+
+    const auto addEvent =
+        [&eventHistory](const std::string &message)
+    {
+        eventHistory.push_back(message);
+
+        // only keeping the newest events so the console does not get completely filled up
+        constexpr std::size_t maxEvents = 12;
+
+        if (eventHistory.size() > maxEvents)
+        {
+            eventHistory.erase(eventHistory.begin());
+        }
+
+        std::cout << message << std::endl;
+    };
+
+    // Placed sprites remain in the universe after being dropped.
+    std::vector<sf::Sprite> placedSprites;
+
+    const auto centerSpriteOrigin =
+        [](sf::Sprite &sprite)
+    {
+        const auto bounds = sprite.getLocalBounds();
+
+        sprite.setOrigin({bounds.position.x + bounds.size.x / 2.f,
+                          bounds.position.y + bounds.size.y / 2.f});
+    };
+
+    const auto isInsideDarkSpace =
+        [&darkSpace](sf::Vector2f point)
+    {
+        return darkSpace.getGlobalBounds().contains(point);
+    };
+
+    const auto keepSpriteInDarkSpace =
+        [&darkSpace](sf::Sprite &sprite, sf::Vector2f position)
+    {
+        const sf::FloatRect area = darkSpace.getGlobalBounds();
+        const sf::Vector2f spriteSize = sprite.getGlobalBounds().size;
+        const float halfWidth = spriteSize.x / 2.f;
+        const float halfHeight = spriteSize.y / 2.f;
+
+        const float minX = area.position.x + halfWidth;
+        const float maxX = area.position.x + area.size.x - halfWidth;
+        const float minY = area.position.y + halfHeight;
+        const float maxY = area.position.y + area.size.y - halfHeight;
+
+        position.x = minX <= maxX
+                         ? std::clamp(position.x, minX, maxX)
+                         : area.position.x + area.size.x / 2.f;
+        position.y = minY <= maxY
+                         ? std::clamp(position.y, minY, maxY)
+                         : area.position.y + area.size.y / 2.f;
+        sprite.setPosition(position);
+    };
+
+    // variables for dragging things from the toolbar into dark space
+    std::optional<sf::Sprite> draggedSprite;
+    std::string draggedName;
+    bool isDragging = false;
+
+    // the planet icon has two jobs, so this helps tell the difference between clicking it and dragging it
+    bool pendingPlanetClick = false;
+    sf::Vector2f planetPressPosition;
+
+    const auto beginDrag =
+        [&draggedSprite, &draggedName, &isDragging, &centerSpriteOrigin](const sf::Sprite &sourceSprite, const std::string &name, sf::Vector2f mousePosition)
+    {
+        // copy the toolbar sprite instead of moving the real toolbar sprite
+        // this means the toolbar never loses an option after the user places something
+        draggedSprite.emplace(sourceSprite);
+        centerSpriteOrigin(*draggedSprite);
+        draggedSprite->setScale({1.25f, 1.25f});
+        draggedSprite->setPosition(mousePosition);
+
+        draggedName = name;
+        isDragging = true;
+    };
+
+    const auto finishDrag =
+        [&draggedSprite, &draggedName, &isDragging, &placedSprites,
+         &isInsideDarkSpace, &keepSpriteInDarkSpace, &addEvent](sf::Vector2f mousePosition)
+    {
+        if (!isDragging || !draggedSprite)
+        {
+            return;
+        }
+
+        // only make the object permanent if it was actually dropped into dark space
+        if (isInsideDarkSpace(mousePosition))
+        {
+            keepSpriteInDarkSpace(*draggedSprite, mousePosition);
+            placedSprites.push_back(*draggedSprite);
+            addEvent(draggedName + " placed in dark space. This change is permanent.");
+        }
+        else
+        {
+            addEvent(draggedName + " returned to the toolbar.");
+        }
+
+        draggedSprite.reset();
+        draggedName.clear();
+        isDragging = false;
+    };
 
     // making a game loop that keeps the window open until the user closes it
     while (window.isOpen())
@@ -236,6 +355,7 @@ int main()
         // INPUT / EVENTS
         while (const std::optional event = window.pollEvent())
         {
+            // close window at exit
             if (event->is<sf::Event::Closed>())
             {
                 window.close();
@@ -254,8 +374,13 @@ int main()
                 updateLayout(resizedEvent->size);
                 updateSpriteLayout(resizedEvent->size);
                 updatePlanetLayout(resizedEvent->size);
+                for (auto &sprite : placedSprites)
+                {
+                    keepSpriteInDarkSpace(sprite, sprite.getPosition());
+                }
             }
 
+            // handle mouse click events for the toolbar and planet dropdown
             if (const auto *mousePressed = event->getIf<sf::Event::MouseButtonPressed>())
             {
                 if (mousePressed->button == sf::Mouse::Button::Left)
@@ -263,12 +388,8 @@ int main()
                     const sf::Vector2f mousePosition =
                         window.mapPixelToCoords(mousePressed->position);
 
-                    // Clicking the selected planet opens/closes the dropdown.
-                    if (activePlanet.getGlobalBounds().contains(mousePosition))
-                    {
-                        isDropdownOpen = !isDropdownOpen;
-                    }
-                    else if (isDropdownOpen)
+                    // if the dropdown is already open, check whether the user picked one of the planets first
+                    if (isDropdownOpen)
                     {
                         bool selectedPlanet = false;
 
@@ -283,42 +404,221 @@ int main()
                                 updatePlanetLayout(window.getSize());
                                 isDropdownOpen = false;
                                 selectedPlanet = true;
+
+                                addEvent("Planet " + std::to_string(i + 1) + " selected.");
                                 break;
                             }
                         }
 
+                        if (selectedPlanet)
+                        {
+                            continue;
+                        }
+
                         // Clicking somewhere else closes the dropdown.
-                        if (!selectedPlanet)
+                        if (!activePlanet.getGlobalBounds().contains(mousePosition))
                         {
                             isDropdownOpen = false;
                         }
+                    }
+
+                    // clicking the planet should open the dropdown, but dragging it should create a planet in dark space
+                    if (activePlanet.getGlobalBounds().contains(mousePosition))
+                    {
+                        pendingPlanetClick = true;
+                        planetPressPosition = mousePosition;
+                        continue;
+                    }
+
+                    // every other toolbar object can immediately start dragging when it is clicked
+                    if (asteroidSprite.getGlobalBounds().contains(mousePosition))
+                    {
+                        beginDrag(asteroidSprite, "Asteroid", mousePosition);
+                    }
+                    else if (earthSprite.getGlobalBounds().contains(mousePosition))
+                    {
+                        beginDrag(earthSprite, "Earth", mousePosition);
+                    }
+                    else if (sunSprite.getGlobalBounds().contains(mousePosition))
+                    {
+                        beginDrag(sunSprite, "Sun", mousePosition);
+                    }
+                    else if (moonSprite.getGlobalBounds().contains(mousePosition))
+                    {
+                        beginDrag(moonSprite, "Moon", mousePosition);
+                    }
+                }
+            }
+
+            // keep the dragged sprite attached to the mouse while the mouse moves
+            if (const auto *mouseMoved = event->getIf<sf::Event::MouseMoved>())
+            {
+                const sf::Vector2f mousePosition =
+                    window.mapPixelToCoords(mouseMoved->position);
+
+                // a little movement means the user wanted to drag the planet instead of opening its dropdown
+                if (pendingPlanetClick)
+                {
+                    const float differenceX = mousePosition.x - planetPressPosition.x;
+                    const float differenceY = mousePosition.y - planetPressPosition.y;
+                    if (differenceX * differenceX + differenceY * differenceY > 49.f)
+                    {
+                        pendingPlanetClick = false;
+                        isDropdownOpen = false;
+
+                        beginDrag(activePlanet,
+                                  "Planet " + std::to_string(activePlanetIndex + 1),
+                                  mousePosition);
+                    }
+                }
+
+                if (isDragging && draggedSprite)
+                {
+                    draggedSprite->setPosition(mousePosition);
+                }
+            }
+
+            // when the user lets go, either open the planet dropdown or finish placing the object
+            if (const auto *mouseReleased = event->getIf<sf::Event::MouseButtonReleased>())
+            {
+                if (mouseReleased->button == sf::Mouse::Button::Left)
+                {
+                    const sf::Vector2f mousePosition =
+                        window.mapPixelToCoords(mouseReleased->position);
+
+                    if (pendingPlanetClick)
+                    {
+                        isDropdownOpen = !isDropdownOpen;
+                        pendingPlanetClick = false;
+                    }
+                    else if (isDragging)
+                    {
+                        finishDrag(mousePosition);
                     }
                 }
             }
         }
 
         // RENDERING
+        // clear screen
         window.clear(sf::Color::White);
 
+        // draw dark space
         window.draw(darkSpace);
-        window.draw(consoleBox);
 
-        window.draw(asteroidSprite);
-        window.draw(earthSprite);
-        window.draw(sunSprite);
-        window.draw(moonSprite);
-        window.draw(activePlanet);
-
-        if (isDropdownOpen)
+        // draw everything that has already been permanently placed in the universe
+        for (const auto &sprite : placedSprites)
         {
-            for (const auto &planet : dropdownPlanets)
-            {
-                window.draw(planet);
-            }
+            window.draw(sprite);
         }
 
-        window.display();
-    }
+        // draw console box
+        window.draw(consoleBox);
 
-    return 0;
+        // draw the event history inside the console box
+        if (fontLoaded)
+        {
+            const sf::Vector2f consolePosition = consoleBox.getPosition();
+            const sf::Vector2f consoleSize = consoleBox.getSize();
+
+            sf::Text title(consoleFont, "UNIVERSE LOG", 20);
+            title.setFillColor(sf::Color::White);
+            title.setPosition({consolePosition.x + 18.f,
+                               consolePosition.y + 16.f});
+            window.draw(title);
+
+            const std::size_t visibleEvents =
+                std::min<std::size_t>(eventHistory.size(), 10);
+
+            const std::size_t firstEvent =
+                eventHistory.size() - visibleEvents;
+
+            float eventY = consolePosition.y + 55.f;
+
+            for (std::size_t i = firstEvent; i < eventHistory.size(); ++i)
+            {
+                sf::Text eventText(consoleFont, "> " + eventHistory[i], 15);
+                eventText.setFillColor(sf::Color(225, 230, 255));
+                eventText.setPosition({consolePosition.x + 18.f, eventY});
+
+                // shorten a message if it is too wide to fit in the blue box
+                if (eventText.getGlobalBounds().size.x >= consoleSize.x - 36.f)
+                {
+                    std::istringstream words(eventHistory[i]);
+
+                    std::string word;
+                    std::string wrapped;
+                    std::string currentLine;
+
+                    while (words >> word)
+                    {
+                        // see what the line would look like if we added the next word
+                        std::string testLine = currentLine;
+
+                        if (!testLine.empty())
+                        {
+                            testLine += " ";
+                        }
+
+                        testLine += word;
+
+                        eventText.setString("> " + testLine);
+
+                        // if the new word makes the line too wide, start a new line
+                        if (eventText.getGlobalBounds().size.x >= consoleSize.x - 36.f)
+                        {
+                            if (!wrapped.empty())
+                            {
+                                wrapped += "\n ";
+                            }
+
+                            wrapped += currentLine;
+                            currentLine = word;
+                        }
+                        else
+                        {
+                            currentLine + testLine;
+                        }
+                    }
+
+                    window.draw(eventText);
+
+                    eventY += 28.f;
+
+                    if (eventY > consolePosition.y + consoleSize.y - 25.f)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            // drawing all sprites in the toolbar
+            // these always stay here even after the user drags a copy into dark space
+            window.draw(asteroidSprite);
+            window.draw(earthSprite);
+            window.draw(sunSprite);
+            window.draw(moonSprite);
+            window.draw(activePlanet);
+
+            // draw the dropdown above everything else when it is open
+            if (isDropdownOpen)
+            {
+                for (const auto &planet : dropdownPlanets)
+                {
+                    window.draw(planet);
+                }
+            }
+
+            // draw the object being dragged last so it stays visible under the mouse
+            if (isDragging && draggedSprite)
+            {
+                window.draw(*draggedSprite);
+            }
+
+            // display the window
+            window.display();
+        }
+
+        return 0;
+    }
 }
