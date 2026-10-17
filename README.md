@@ -164,10 +164,6 @@ Possible responsibilities include movement, velocity, attraction, boundaries, an
 
 Intended to separate drawing and visual responsibilities from game-state logic. This should help keep `main.cpp` and the universe classes easier to understand as the project becomes larger.
 
-### `random.cpp`
-
-Reserved for behavior that requires random generation or variation. Its exact role is still developing alongside the rest of the project.
-
 ## Technologies
 
 The project currently uses:
