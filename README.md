@@ -325,6 +325,10 @@ The universe could then maintain a collection of events that the console can dis
 
 The final implementation may change significantly as the project develops.
 
+## Assets
+
+**Assets are not my own creations**, they were found on itch.io by [JIK-A-4](https://jik-a-4.itch.io/freepixel). 
+
 ## Planned Features
 
 Near-term goals:
@@ -439,3 +443,7 @@ A `LICENSE` file is included in the repository. Refer to that file for the proje
 **Graphics / Window Library:** SFML 3.1  
 **Build System:** CMake  
 **Current Focus:** UI interaction, planet selection, drag-and-drop, and object-oriented celestial-body architecture
+
+## AI DISLCAIMER
+
+AI was used as a development aid to help debug issues and work through some of the program's logic. I used it alongside my own development and testing while learning C++, SFML, event handling, and UI design.
